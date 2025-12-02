@@ -3,10 +3,20 @@
 <head>
     <meta charset="utf-8">
     <title>AR.js NFT Marker</title>
+    <!-- Используем стабильные версии -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <!-- Используем CDN вместо raw.githack -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar-nft.js"></script>
     
     <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
         .arjs-loader {
             height: 100%;
             width: 100%;
@@ -26,72 +36,108 @@
             color: white;
         }
         
-        body {
-            margin: 0;
-            overflow: hidden;
+        .arjs-loader.hidden {
+            display: none;
+        }
+        
+        a-scene {
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
 <body>
     <div class="arjs-loader">
-        <div>Loading AR.js, please wait...</div>
+        <div>Загрузка AR.js... Разрешите доступ к камере</div>
     </div>
     
     <a-scene 
         vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true; antialias: true;"
+        renderer="antialias: true; alpha: true"
         embedded 
-        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+        arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; maxDetectionRate: 60;"
     >
-        <!-- 
-            Важно: NFT маркер требует 3 файла:
-            - pepsi.fset
-            - pepsi.fset3
-            - pepsi.iset
-            
-            Они должны быть доступны по указанному пути (например, в папке pepsi/)
-            Создать их можно через: https://carnaux.github.io/NFT-Marker-Creator/
-        -->
+        <!-- Простая тестовая сфера вместо модели -->
         <a-nft
             type="nft"
-            url="./pepsi"  <!-- путь к файлам маркера без расширения -->
+            url="https://arjs-cdn.s3.amazonaws.com/ARjs/models/train/train"
+            raycaster="objects: .clickable"
+            emitevents="true"
             smooth="true"
             smoothCount="10"
             smoothTolerance="0.01"
             smoothThreshold="5"
         >
-            <!-- Уменьшил масштаб и позицию для лучшего отображения -->
-            <a-entity
-                gltf-model="./CesiumMan.gltf"
-                scale="0.05 0.05 0.05"
-                position="0 0 0"
-                rotation="0 0 0"
-            >
-            </a-entity>
+            <a-sphere 
+                class="clickable"
+                position="0 0.5 0" 
+                radius="0.1" 
+                color="#FF0000"
+            ></a-sphere>
         </a-nft>
         
-        <!-- Камера для AR -->
         <a-entity camera></a-entity>
     </a-scene>
     
     <script>
-        // Скрываем лоадер после загрузки сцены
-        document.querySelector('a-scene').addEventListener('loaded', function() {
-            setTimeout(function() {
-                var loader = document.querySelector('.arjs-loader');
-                if (loader) {
-                    loader.style.display = 'none';
-                }
-            }, 1500);
+        // Обработчики событий
+        window.addEventListener('DOMContentLoaded', () => {
+            const scene = document.querySelector('a-scene');
+            const loader = document.querySelector('.arjs-loader');
+            
+            if (!scene) {
+                console.error('Сцена не найдена!');
+                loader.innerHTML = '<div>Ошибка: сцена не найдена</div>';
+                return;
+            }
+            
+            // Когда сцена загружена
+            scene.addEventListener('loaded', () => {
+                console.log('Сцена загружена');
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                }, 2000);
+            });
+            
+            // При ошибке загрузки
+            scene.addEventListener('error', (e) => {
+                console.error('Ошибка сцены:', e.detail);
+                loader.innerHTML = `
+                    <div>
+                        Ошибка загрузки AR.<br>
+                        Проверьте:<br>
+                        1. Доступ к камере<br>
+                        2. Соединение HTTPS<br>
+                        3. Консоль разработчика (F12)
+                    </div>
+                `;
+            });
+            
+            // Проверяем доступ к камере
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    console.log('Доступ к камере получен');
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(err => {
+                    console.error('Нет доступа к камере:', err);
+                    loader.innerHTML = `
+                        <div>
+                            Требуется доступ к камере!<br>
+                            Разрешите использование камеры<br>
+                            и обновите страницу.
+                        </div>
+                    `;
+                });
         });
         
-        // Обработка ошибок загрузки
-        document.querySelector('a-scene').addEventListener('error', function(e) {
-            console.error('Scene error:', e.detail);
-            var loader = document.querySelector('.arjs-loader');
-            if (loader) {
-                loader.innerHTML = '<div>Error loading AR scene. Check console.</div>';
-            }
+        // Логирование статуса загрузки ресурсов
+        window.addEventListener('arjs-nft-loaded', (e) => {
+            console.log('NFT маркер загружен:', e.detail);
+        });
+        
+        window.addEventListener('arjs-video-loaded', (e) => {
+            console.log('Видео загружено');
         });
     </script>
 </body>
